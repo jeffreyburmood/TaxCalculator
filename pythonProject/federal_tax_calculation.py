@@ -54,6 +54,7 @@ federal_agi = max(0, income - STANDARD_DEDUCTION)  # Ensure income doesn't go ne
 
 total_tax, breakdown = calculate_federal_tax(federal_agi)
 
+print(f'Federal AGI: ${federal_agi}')
 print(f"Total Federal Tax Owed: ${total_tax:,.2f}")
 print("Breakdown:")
 for lower, upper, rate, taxable, tax in breakdown:
