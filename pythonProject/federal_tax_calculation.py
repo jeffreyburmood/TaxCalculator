@@ -48,7 +48,7 @@ def calculate_arizona_tax(federal_agi, filing_status='married_joint'):
 
 
 # Adjust income for standard deduction
-STANDARD_DEDUCTION = float(29200 + (2 * 3050))  # Married filing jointly, both 65+
+STANDARD_DEDUCTION = float(29200 + (2 * 1550))  # Married filing jointly, both 65+
 income = float(input("Enter your total income before deductions: "))
 federal_agi = max(0, income - STANDARD_DEDUCTION)  # Ensure income doesn't go negative
 
