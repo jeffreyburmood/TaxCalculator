@@ -1,20 +1,20 @@
 def calculate_federal_tax(income, ltcg=0):
     # brackets for 2025 Married Filing Jointly
     brackets = [
-        (0, 23850, 0.10),
-        (23850, 96950, 0.12),
-        (96950, 206700, 0.22),
-        (206700, 394600, 0.24),
-        (394600, 501050, 0.32),
-        (501050, 751600, 0.35),
-        (751600, float('inf'), 0.37)
+        (0, 23850, 0.10),  # (0, 24800)
+        (23850, 96950, 0.12), # (24801, 100800)
+        (96950, 206700, 0.22), # (100801, 211400)
+        (206700, 394600, 0.24), # (211401, 403550)
+        (394600, 501050, 0.32), # (403551, 512450)
+        (501050, 751600, 0.35), # (512451, 768700)
+        (751600, float('inf'), 0.37) # (76701, +)
     ]
 
     # LTCG tax brackets for MFJ (2025)
     ltcg_brackets = [
-        (0, 89250, 0.0),
-        (89250, 553850, 0.15),
-        (553850, float('inf'), 0.20)
+        (0, 89250, 0.0), # (0, 98900, 0)
+        (89250, 553850, 0.15), # (98901, 613700, 15)
+        (553850, float('inf'), 0.20) # (613701, +, 20)
     ]
 
     total_income = income + ltcg
@@ -65,7 +65,7 @@ def calculate_arizona_tax(federal_agi, filing_status='married_joint'):
     # Arizona standard deductions for 2024 (to be used for 2025 filing)
     standard_deductions = {
         'single': 14600,
-        'married_joint': 30000,
+        'married_joint': 30000,  # 32200 for 2026
         'married_separate': 14600,
         'head_of_household': 21900
     }
@@ -83,7 +83,7 @@ def calculate_arizona_tax(federal_agi, filing_status='married_joint'):
 
 def calculate_all(total_income, ss_benefits, ltcg):
     # Apply standard deduction for married couple both over 65
-    STANDARD_DEDUCTION = 30000 + (2 * 1600) + (2 * 6000) # 2025 values
+    STANDARD_DEDUCTION = 30000 + (2 * 1600) + (2 * 6000) # 2 * 2050 for 2026 - same 2 * 6000 for 2026
     agi_ex_ss = max(0, total_income - STANDARD_DEDUCTION)
     provisional, taxed_ss, pct = calculate_taxable_ss(agi_ex_ss, ss_benefits)
     agi = agi_ex_ss + taxed_ss
