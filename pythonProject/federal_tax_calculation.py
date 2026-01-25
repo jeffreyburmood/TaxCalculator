@@ -1,3 +1,46 @@
+""" this file contains methods used to calculate federal and state tax estimates for a given tax year """
+from scipy.constants import year
+
+
+class TaxYear(year):
+    def __init__(self, year):
+        self.year = year
+        self.federal_brackets = []
+        self.ltcg_brackets = []
+        self.federal_std_deductions = float(0)
+        self.federal_over_65_deductions = float(0)
+        self.federal_over_65_extra_deductions = float(0)
+        self.arizona_std_deductions = ""
+        self.arizona_tax_rate = float(0)
+        self.ss_thresholds = (float(0), float(0))
+
+    def get_federal_brackets(self):
+        pass
+
+    def get_ltcg_brackets(self):
+        pass
+
+    def get_federal_std_deductions(self):
+        pass
+
+    def get_arizona_std_deductions(self):
+        pass
+
+    def get_arizona_tax_rate(self):
+        pass
+
+    def get_federal_over_65_deductions(self):
+        pass
+
+    def get_federal_over_65_extra_deductions(self):
+        pass
+
+    def get_ss_thresholds(self):
+        pass
+
+    def populate_brackets(year):
+        pass
+
 def calculate_federal_tax(income, ltcg=0):
     # brackets for 2025 Married Filing Jointly
     brackets = [
