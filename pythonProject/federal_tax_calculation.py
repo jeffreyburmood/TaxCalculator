@@ -13,7 +13,7 @@ class TaxTables():
         self.federal_over_65_deduction = float(0)
         self.federal_over_65_extra_deduction = float(0)
         self.arizona_tax_rate = float(0)
-        self.ss_thresholds = (float(0), float(0))
+        self.ss_thresholds = (float(0), float(0), float(0))
 
     def get_federal_brackets(self):
 
@@ -110,9 +110,9 @@ class TaxTables():
 
     def get_ss_thresholds(self):
         if self.year == '2025':
-            self.ss_thresholds = (float(32000), float(44000))
+            self.ss_thresholds = (float(32000), float(44000), float(0.85))
         elif self.year == '2026':
-            self.ss_thresholds = (float(32000), float(44000))
+            self.ss_thresholds = (float(32000), float(44000), float(0.85))
         else:
             # No match found in the if/elif chain
             raise NoMatchFoundError(f"Unrecognized tax year: {self.year}")
@@ -155,26 +155,59 @@ def calculate_federal_tax(income, ltcg, tax_tables):
     return ordinary_tax + ltcg_tax, ordinary_tax, ltcg_tax, tax_breakdown
 
 
-def calculate_taxable_ss(agi_ex_ss, ss_benefits, tax_tables):
-    provisional = agi_ex_ss + 0.5 * ss_benefits
+def calculate_taxable_ss(total_income, ss_benefits, tax_tables):
+    """
+    Calculate provisional income and taxable Social Security benefits
+    for a Married Filing Jointly couple using standard IRS rules.
+
+    Parameters
+    ----------
+    non_ss_income : float
+        All non–Social Security income that goes into provisional income
+        (wages, pensions, IRA distributions, interest, etc.).
+        Assumes no tax-exempt interest for simplicity. Add that in if needed.
+    ss_benefits : float
+        Total Social Security benefits received during the year.
+
+    Returns
+    -------
+    provisional_income : float
+        Provisional income used to determine taxable Social Security.
+    taxable_ss : float
+        Amount of Social Security benefits that is taxable.
+    percent_taxable : float
+        Percentage of Social Security benefits that is taxable (0–100).
+    """
+    provisional = total_income + 0.5 * ss_benefits
     # Thresholds for 2025 married filing jointly
-    t1, t2 = tax_tables.get_ss_thresholds()
+    t1, t2, max_rate = tax_tables.get_ss_thresholds()
     if provisional <= t1:
         taxed_ss = 0
     elif provisional <= t2:
         taxed_ss = min(0.5 * ss_benefits, 0.5 * (provisional - t1))
     else:
-        part1 = min(0.5 * ss_benefits, 0.5 * (t2 - t1))
-        part2 = min(0.85 * ss_benefits, 0.35 * (provisional - t2))
-        taxed_ss = part1 + part2
-    percent_taxed = taxed_ss / ss_benefits * 100 if ss_benefits > 0 else 0
+        #part1 = min(0.5 * ss_benefits, (t2 - t1))
+        #part2 = min(0.85 * ss_benefits, 0.35 * (provisional - t2))
+        #taxed_ss = part1 + part2
+
+        smaller_of_50pct = min(0.5 * ss_benefits, 6_000.0)
+        option1 = 0.85 * (provisional - t2) + smaller_of_50pct
+        option2 = max_rate * ss_benefits
+
+        taxed_ss = min(option1, option2)
+
+    if ss_benefits > 0:
+        percent_taxed = (taxed_ss / ss_benefits) * 100.0
+    else:
+        percent_taxed = 0.0
+
     return provisional, taxed_ss, percent_taxed
 
 def calculate_arizona_tax(federal_agi, tax_tables):
 
     standard_deduction = tax_tables.get_federal_std_deduction()
     # Calculate Arizona taxable income
-    arizona_taxable_income = max(0, federal_agi - standard_deduction)
+    arizona_taxable_income = max(0, federal_agi)
     # Arizona flat tax rate
     tax_rate = tax_tables.get_arizona_tax_rate()
     # Calculate tax owed
@@ -182,14 +215,13 @@ def calculate_arizona_tax(federal_agi, tax_tables):
 
     return az_tax_owed
 
-def calculate_all(total_income, ss_benefits, ltcg, tax_year):
+def calculate_all(total_non_ss_income, ss_benefits, ltcg, tax_year):
     tax_tables = TaxTables(tax_year)
     # Apply standard deduction for married couple both over 65
     # standard_deduction = 30000 + (2 * 1600) + (2 * 6000) # 2 * 2050 for 2026 - same 2 * 6000 for 2026
     standard_deduction = tax_tables.get_federal_std_deduction() + (2 * tax_tables.get_federal_over_65_deduction()) + (2 * tax_tables.get_federal_over_65_extra_deduction())
-    agi_ex_ss = max(0, total_income - standard_deduction)
-    provisional, taxed_ss, pct = calculate_taxable_ss(agi_ex_ss, ss_benefits, tax_tables)
-    agi = agi_ex_ss + taxed_ss
+    provisional_income, taxed_ss, pct = calculate_taxable_ss(total_non_ss_income, ss_benefits, tax_tables)
+    agi = max(0, provisional_income - standard_deduction)
     total_tax, ordinary_tax, ltcg_tax, tax_breakdown = calculate_federal_tax(agi, ltcg, tax_tables)
     state_tax = calculate_arizona_tax(agi + ltcg, tax_tables)
 
@@ -199,7 +231,7 @@ def calculate_all(total_income, ss_benefits, ltcg, tax_year):
         print(f"Taxable income of ${taxable:,.0f} in the range from ${lower:,.0f} to ${upper:,.0f} taxed at {rate * 100:.0f}%: ${tax:,.2f}")
 
     return {
-        'provisional_income': provisional,
+        'provisional_income': provisional_income,
         'taxable_ss': taxed_ss,
         'percent_ss_taxed': pct,
         'federal_ag_user': agi,
