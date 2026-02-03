@@ -120,39 +120,72 @@ class TaxTables():
         return self.ss_thresholds
 
 def calculate_federal_tax(income, ltcg, tax_tables):
+    """
+     Calculate 2025 federal income tax owed for Married Filing Jointly,
+     given provisional income and standard deduction.
+
+     Parameters
+     ----------
+     provisional_income : float
+         Provisional income (non-SS income + 1/2 SS + tax-exempt interest).
+     ss_benefits : float
+         Total Social Security benefits received during the year.
+     standard_deduction : float
+         Standard deduction amount for the couple (including age additions).
+
+     Returns
+     -------
+     tax_owed : float
+         Federal income tax owed (before credits).
+     """
+
     # brackets for 2025 Married Filing Jointly
     brackets = tax_tables.get_federal_brackets()
 
     # LTCG tax brackets for MFJ (2025)
     ltcg_brackets = tax_tables.get_ltcg_brackets()
 
-    total_income = income + ltcg
+    taxable_income = income + ltcg
 
     tax_breakdown = []
     # Calculate ordinary income tax
-    ordinary_tax = 0
+    # ordinary_tax = 0
+    # for lower, upper, rate in brackets:
+    #     if income > lower:
+    #         taxable_amount = min(income, upper) - lower
+    #         tax = taxable_amount * rate
+    #         ordinary_tax += tax
+    #         tax_breakdown.append((lower, upper, rate, taxable_amount, tax))
+    #         if income <= upper:
+    #             break
+
+    tax = 0.0
+    remaining = taxable_income
+
     for lower, upper, rate in brackets:
-        if income > lower:
-            taxable_amount = min(income, upper) - lower
-            tax = taxable_amount * rate
-            ordinary_tax += tax
-            tax_breakdown.append((lower, upper, rate, taxable_amount, tax))
-            if income <= upper:
-                break
+        if remaining <= 0:
+            break
+        # Income in this bracket is the segment of taxable_income between
+        # 'lower' and 'upper'
+        amount_in_bracket = max(0.0, min(remaining, upper - lower))
+        tax += amount_in_bracket * rate
+        tax_breakdown.append((lower, upper, rate, amount_in_bracket, tax))
+
+        remaining -= amount_in_bracket
 
     # Calculate LTCG tax
     ltcg_tax = 0
     remaining_ltcg = ltcg
     for low, high, rate in ltcg_brackets:
-        if total_income > low:
-            taxed = min(total_income, high) - low
+        if taxable_income > low:
+            taxed = min(taxable_income, high) - low
             taxable_ltcg = min(taxed, remaining_ltcg)
             ltcg_tax += taxable_ltcg * rate
             remaining_ltcg -= taxable_ltcg
             if remaining_ltcg <= 0:
                 break
 
-    return ordinary_tax + ltcg_tax, ordinary_tax, ltcg_tax, tax_breakdown
+    return tax + ltcg_tax, tax, ltcg_tax, tax_breakdown
 
 
 def calculate_taxable_ss(total_income, ss_benefits, tax_tables):
@@ -220,10 +253,11 @@ def calculate_all(total_non_ss_income, ss_benefits, ltcg, tax_year):
     # Apply standard deduction for married couple both over 65
     # standard_deduction = 30000 + (2 * 1600) + (2 * 6000) # 2 * 2050 for 2026 - same 2 * 6000 for 2026
     standard_deduction = tax_tables.get_federal_std_deduction() + (2 * tax_tables.get_federal_over_65_deduction()) + (2 * tax_tables.get_federal_over_65_extra_deduction())
-    provisional_income, taxed_ss, pct = calculate_taxable_ss(total_non_ss_income, ss_benefits, tax_tables)
-    agi = max(0, provisional_income - standard_deduction)
-    total_tax, ordinary_tax, ltcg_tax, tax_breakdown = calculate_federal_tax(agi, ltcg, tax_tables)
-    state_tax = calculate_arizona_tax(agi + ltcg, tax_tables)
+    provisional_income, taxable_ss, pct = calculate_taxable_ss(total_non_ss_income, ss_benefits, tax_tables)
+    agi = max(0, total_non_ss_income + taxable_ss)
+    taxable_income = agi - standard_deduction
+    total_tax, ordinary_tax, ltcg_tax, tax_breakdown = calculate_federal_tax(taxable_income, ltcg, tax_tables)
+    state_tax = calculate_arizona_tax(taxable_income + ltcg, tax_tables)
 
     print('\n')
 
@@ -232,7 +266,7 @@ def calculate_all(total_non_ss_income, ss_benefits, ltcg, tax_year):
 
     return {
         'provisional_income': provisional_income,
-        'taxable_ss': taxed_ss,
+        'taxable_ss': taxable_ss,
         'percent_ss_taxed': pct,
         'federal_ag_user': agi,
         'federal_tax_owed': total_tax,
@@ -252,7 +286,7 @@ if __name__ == "__main__":
     print(f"Taxable SS Benefits: ${res['taxable_ss']:.2f}")
     print(f"Percent of SS taxed: {res['percent_ss_taxed']:.1f}%")
     print(f"Federal AGI (incl. taxable SS & LTCG): ${res['federal_ag_user']:.2f}")
-    print(f"Federal Tax Owed (2025 brackets): ${res['federal_tax_owed']:.2f}")
+    print(f"Federal Tax Owed ({tax_year} brackets): ${res['federal_tax_owed']:.2f}")
     print(f"  - Ordinary Income Tax: ${res['ordinary_tax']:.2f}")
     print(f"  - Long-Term Capital Gains Tax: ${res['ltcg_tax']:.2f}")
     print(f"AZ State Tax Owed (2025 brackets): ${res['state_tax_owed']:.2f}")
